@@ -1,0 +1,97 @@
+/* Copyright 2019-2021 Canaan Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+#pragma once
+#include "../../native_vector.h"
+#include <arm_neon.h>
+
+#ifndef NTT_VLEN
+constexpr size_t NTT_VLEN = (sizeof(int8x16_t) * 8);
+#endif
+
+NTT_BEGIN_DEFINE_NATIVE_VECTOR_DEFAULT(int8_t, int8x16_t, 16)
+NTT_END_DEFINE_NATIVE_VECTOR()
+
+NTT_BEGIN_DEFINE_NATIVE_VECTOR_DEFAULT(uint8_t, uint8x16_t, 16)
+NTT_END_DEFINE_NATIVE_VECTOR()
+
+NTT_BEGIN_DEFINE_NATIVE_VECTOR_DEFAULT(int16_t, int16x8_t, 8)
+NTT_END_DEFINE_NATIVE_VECTOR()
+
+NTT_BEGIN_DEFINE_NATIVE_VECTOR_DEFAULT(uint16_t, uint16x8_t, 8)
+NTT_END_DEFINE_NATIVE_VECTOR()
+
+NTT_BEGIN_DEFINE_NATIVE_VECTOR_DEFAULT(int32_t, int32x4_t, 4)
+NTT_END_DEFINE_NATIVE_VECTOR()
+
+NTT_BEGIN_DEFINE_NATIVE_VECTOR_DEFAULT(uint32_t, uint32x4_t, 4)
+NTT_END_DEFINE_NATIVE_VECTOR()
+
+NTT_BEGIN_DEFINE_NATIVE_VECTOR_DEFAULT(int64_t, int64x2_t, 2)
+NTT_END_DEFINE_NATIVE_VECTOR()
+
+NTT_BEGIN_DEFINE_NATIVE_VECTOR_DEFAULT(uint64_t, uint64x2_t, 2)
+NTT_END_DEFINE_NATIVE_VECTOR()
+
+NTT_BEGIN_DEFINE_NATIVE_VECTOR_DEFAULT(float, float32x4_t, 4)
+NTT_END_DEFINE_NATIVE_VECTOR()
+
+NTT_BEGIN_DEFINE_NATIVE_VECTOR(float, float32x4x2_t, 8)
+template <Dimensions TIndex>
+static float get_element(const float32x4x2_t &array,
+                         const TIndex &index) noexcept {
+    static_assert(TIndex::rank() == 1, "index must be 1D");
+    return array.val[index[dim_zero] / 4][index[dim_zero] % 4];
+}
+
+template <Dimensions TIndex>
+static void set_element(float32x4x2_t &array, const TIndex &index,
+                        float value) noexcept {
+    static_assert(TIndex::rank() == 1, "index must be 1D");
+    array.val[index[dim_zero] / 4][index[dim_zero] % 4] = value;
+}
+NTT_END_DEFINE_NATIVE_VECTOR()
+
+NTT_BEGIN_DEFINE_NATIVE_VECTOR_DEFAULT(double, float64x2_t, 2)
+NTT_END_DEFINE_NATIVE_VECTOR()
+
+// mask vectors
+#define NTT_DEFINE_NATIVE_MASK_VECTOR(native_type, bits)                       \
+    NTT_BEGIN_DEFINE_NATIVE_VECTOR(bool, native_type, NTT_VLEN / bits)         \
+                                                                               \
+    template <Dimensions TIndex>                                               \
+    static bool get_element(const native_type &array,                          \
+                            const TIndex &index) noexcept {                    \
+        static_assert(TIndex::rank() == 1, "index must be 1D");                \
+        const auto offset = (size_t)index[dim_zero];                           \
+        return array[offset] != 0;                                             \
+    }                                                                          \
+                                                                               \
+    template <Dimensions TIndex>                                               \
+    static void set_element(native_type &array, const TIndex &index,           \
+                            bool value) noexcept {                             \
+        using element_type = std::decay_t<decltype(native_type{}[0])>;         \
+        constexpr auto true_value = element_type(-1);                          \
+        static_assert(TIndex::rank() == 1, "index must be 1D");                \
+        const auto offset = (size_t)index[dim_zero];                           \
+        array[offset] = value ? true_value : 0;                                \
+    }                                                                          \
+    NTT_END_DEFINE_NATIVE_VECTOR()
+
+NTT_DEFINE_NATIVE_MASK_VECTOR(uint8x16_t, 8)
+NTT_DEFINE_NATIVE_MASK_VECTOR(uint16x8_t, 16)
+NTT_DEFINE_NATIVE_MASK_VECTOR(uint32x4_t, 32)
+NTT_DEFINE_NATIVE_MASK_VECTOR(uint64x2_t, 64)
+
+#undef NTT_DEFINE_NATIVE_MASK_VECTOR
